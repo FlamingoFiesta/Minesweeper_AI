@@ -9,8 +9,21 @@ import platform
 import time
 from datetime import time, date, datetime
 
-SIZE_X = 10
-SIZE_Y = 10
+import numpy as np
+import random
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+from ReinforcementLearning.minesweeper_env import MinesweeperEnv
+from ReinforcementLearning.dqn_agent import DQNAgent
+
+SIZE_X = 11
+SIZE_Y = 11
+NUM_MINES = 20
 
 STATE_DEFAULT = 0
 STATE_CLICKED = 1
@@ -25,6 +38,10 @@ class Minesweeper:
 
     def __init__(self, tk):
 
+        self.tk = tk
+        self.env = MinesweeperEnv(SIZE_X, SIZE_Y, NUM_MINES)
+        self.agent = DQNAgent(SIZE_X * SIZE_Y, SIZE_X * SIZE_Y)
+
         # import images
         self.images = {
             "plain": PhotoImage(file = "images/tile_plain.gif"),
@@ -38,7 +55,6 @@ class Minesweeper:
             self.images["numbers"].append(PhotoImage(file = "images/tile_"+str(i)+".gif"))
 
         # set up frame
-        self.tk = tk
         self.frame = Frame(self.tk)
         self.frame.pack()
 
@@ -52,64 +68,49 @@ class Minesweeper:
         self.labels["mines"].grid(row = SIZE_X+1, column = 0, columnspan = int(SIZE_Y/2)) # bottom left
         self.labels["flags"].grid(row = SIZE_X+1, column = int(SIZE_Y/2)-1, columnspan = int(SIZE_Y/2)) # bottom right
 
-        self.restart() # start game
+        #self.restart() # start game
+        self.reset_game()
         self.updateTimer() # init timer
 
+    def reset_game(self):
+        self.state = self.env.reset()
+        self.setup()
+
     def setup(self):
-        # create flag and clicked tile variables
+        self.tiles = {}
         self.flagCount = 0
         self.correctFlagCount = 0
         self.clickedCount = 0
-        self.startTime = None
-
-        # create buttons
-        self.tiles = dict({})
         self.mines = 0
-        for x in range(0, SIZE_X):
-            for y in range(0, SIZE_Y):
-                if y == 0:
-                    self.tiles[x] = {}
-
-                id = str(x) + "_" + str(y)
-                isMine = False
-
-                # tile image changeable for debug reasons:
-                gfx = self.images["plain"]
-
-                # currently random amount of mines
-                if random.uniform(0.0, 1.0) < 0.1:
-                    isMine = True
-                    self.mines += 1
-
+        for x in range(SIZE_X):
+            for y in range(SIZE_Y):
+                id = f"{x}_{y}"
+                isMine = random.random() < 0.1
+                self.mines += isMine
                 tile = {
                     "id": id,
                     "isMine": isMine,
                     "state": STATE_DEFAULT,
-                    "coords": {
-                        "x": x,
-                        "y": y
-                    },
-                    "button": Button(self.frame, image = gfx),
-                    "mines": 0 # calculated after grid is built
+                    "coords": {"x": x, "y": y},
+                    "button": Button(self.frame, image=self.images["plain"]),
+                    "mines": 0  # Updated later
                 }
-
                 tile["button"].bind(BTN_CLICK, self.onClickWrapper(x, y))
                 tile["button"].bind(BTN_FLAG, self.onRightClickWrapper(x, y))
-                tile["button"].grid( row = x+1, column = y ) # offset by 1 row for timer
+                tile["button"].grid(row=x+1, column=y)  # Offset for labels
+                self.tiles[id] = tile
 
-                self.tiles[x][y] = tile
-
-        # loop again to find nearby mines and display number on tile
-        for x in range(0, SIZE_X):
-            for y in range(0, SIZE_Y):
-                mc = 0
-                for n in self.getNeighbors(x, y):
-                    mc += 1 if n["isMine"] else 0
-                self.tiles[x][y]["mines"] = mc
-
+        # Calculate mines around each tile
+        for x in range(SIZE_X):
+            for y in range(SIZE_Y):
+                tile_id = f"{x}_{y}"
+                tile = self.tiles[tile_id]
+                tile["mines"] = sum(1 for n in self.getNeighbors(x, y) if n["isMine"])
+    """ old structure
     def restart(self):
         self.setup()
         self.refreshLabels()
+
 
     def refreshLabels(self):
         self.labels["flags"].config(text = "Flags: "+str(self.flagCount))
@@ -238,6 +239,55 @@ class Minesweeper:
 
         tile["state"] = STATE_CLICKED
         self.clickedCount += 1
+    """
+
+    def onClickWrapper(self, x, y):
+        return lambda Button: self.onClick(self.tiles[f"{x}_{y}"])
+
+    def onRightClickWrapper(self, x, y):
+        return lambda Button: self.onRightClick(self.tiles[f"{x}_{y}"])
+
+    def onClick(self, tile):
+        if tile["state"] == STATE_DEFAULT:
+            state, reward, done = self.env.step((tile["coords"]["x"], tile["coords"]["y"]))
+            if done:
+                self.reset_game()
+            self.update_gui(tile)
+
+    def onRightClick(self, tile):
+        if tile["state"] == STATE_DEFAULT:
+            state, reward, done = self.env.step((tile["coords"]["x"], tile["coords"]["y"]), flag=True)
+            if done:
+                self.reset_game()
+            self.update_gui(tile)
+
+    def update_gui(self, tile):
+        # Update the tile based on its state after an action
+        if tile["isMine"]:
+            tile["button"].config(image=self.images["mine"])
+        elif tile["mines"] > 0:
+            tile["button"].config(image=self.images["numbers"][tile["mines"]-1])
+        else:
+            tile["button"].config(image=self.images["clicked"])
+
+    def getNeighbors(self, x, y):
+        neighbors = []
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < SIZE_X and 0 <= ny < SIZE_Y and (dx != 0 or dy != 0):
+                    neighbors.append(self.tiles[f"{nx}_{ny}"])
+        return neighbors
+
+    def updateTimer(self):
+        ts = "00:00:00"
+        if self.startTime is not None:
+            delta = datetime.now() - self.startTime
+            ts = str(delta).split('.')[0]  # Drop milliseconds
+            if delta.total_seconds() < 36000:
+                ts = "0" + ts  # Zero-pad
+        self.labels["time"].config(text=ts)
+        self.frame.after(100, self.updateTimer)
 
 ### END OF CLASSES ###
 
