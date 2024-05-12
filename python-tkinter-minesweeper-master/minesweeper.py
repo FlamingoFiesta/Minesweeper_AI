@@ -136,7 +136,7 @@ class Minesweeper:
             self.update_gui_based_on_state()  # Refresh the entire board
             if not done:
                 # If the game is not done, schedule the next action
-                self.tk.after(500, self.run_agent) #SPEED
+                self.tk.after(10, self.run_agent) #SPEED
             else:
                 # If the game is done, process the end of the game
                 print("Game Over!")
