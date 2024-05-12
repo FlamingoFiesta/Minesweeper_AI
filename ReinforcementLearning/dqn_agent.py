@@ -6,6 +6,8 @@ import torch.optim as optim
 import random
 from collections import deque
 
+import os
+
 class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(QNetwork, self).__init__()
@@ -22,8 +24,12 @@ class QNetwork(nn.Module):
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.model_dir = os.path.join(current_dir, 'Agent')
+        os.makedirs(self.model_dir, exist_ok=True)
         self.state_size = state_size
         self.action_size = action_size
+        #self.action_size = self.rows * self.cols
         self.memory = deque(maxlen=5000)
         self.gamma = 0.99  # Discount factor for past rewards
         self.epsilon = 1.0  # Exploration rate
@@ -64,8 +70,22 @@ class DQNAgent:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
-    def load(self, name):
+    def load_old(self, name):
         self.model.load_state_dict(torch.load(name))
+        self.model.eval()  # Set the model to evaluation mode
+        print("Model loaded from", name)
 
-    def save(self, name):
+    def save_old(self, name):
         torch.save(self.model.state_dict(), name)
+        print("Model saved to", name)
+
+    def save(self, filename="model.pth"):
+        full_path = os.path.join(self.model_dir, filename)
+        torch.save(self.model.state_dict(), full_path)
+        #print("Model saved to", full_path)
+
+    def load(self, filename="model.pth"):
+        full_path = os.path.join(self.model_dir, filename)
+        self.model.load_state_dict(torch.load(full_path))
+        self.model.eval()  # Set the model to evaluation mode
+        print("Model loaded from", full_path)
