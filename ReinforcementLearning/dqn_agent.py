@@ -82,7 +82,7 @@ class DQNAgent:
     def save(self, filename="model.pth"):
         full_path = os.path.join(self.model_dir, filename)
         torch.save(self.model.state_dict(), full_path)
-        #print("Model saved to", full_path)
+        print("Model saved to", full_path)
 
     def load(self, filename="model.pth"):
         full_path = os.path.join(self.model_dir, filename)
