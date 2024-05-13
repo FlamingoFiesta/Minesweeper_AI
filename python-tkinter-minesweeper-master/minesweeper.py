@@ -49,6 +49,7 @@ class Minesweeper:
         self.total_rewards = []
         self.steps_per_game = []
         self.current_step = 0
+        self.revealed_cells = 0
         #action_size = SIZE_X * SIZE_Y
         #self.env = MinesweeperEnv(SIZE_X, SIZE_Y, NUM_MINES)
         #self.agent = DQNAgent(SIZE_X * SIZE_Y, SIZE_X * SIZE_Y)
@@ -84,6 +85,19 @@ class Minesweeper:
         #self.labels["time"].grid(row = 0, column = 0, columnspan = SIZE_Y) # top full width
         #self.labels["mines"].grid(row = SIZE_X+1, column = 0, columnspan = int(SIZE_Y/2)) # bottom left
         #self.labels["flags"].grid(row = SIZE_X+1, column = int(SIZE_Y/2)-1, columnspan = int(SIZE_Y/2)) # bottom right
+
+        self.stats_labels = {
+            "stats": Label(self.frame, text="Statistics: "),
+            "total_episodes": Label(self.frame, text="Total episodes: 0"),
+            "total_wins": Label(self.frame, text="Total wins: 0"),
+            "total_reward": Label(self.frame, text="Total reward: 0")
+        }
+
+        stats_column = self.cols + 1 
+        self.stats_labels["stats"].grid(row=0, column=stats_column, sticky="nw")
+        self.stats_labels["total_episodes"].grid(row=1, column=stats_column, sticky="nw")
+        self.stats_labels["total_wins"].grid(row=2, column=stats_column, sticky="nw")
+        self.stats_labels["total_reward"].grid(row=3, column=stats_column, sticky="nw") 
 
         self.labels["time"].grid(row=0, column=0, columnspan=self.cols) # top full width
         self.labels["mines"].grid(row=self.rows+1, column=0, columnspan=int(self.cols/2)) # bottom left
@@ -136,7 +150,7 @@ class Minesweeper:
             self.update_gui_based_on_state()  # Refresh the entire board
             if not done:
                 # If the game is not done, schedule the next action
-                self.tk.after(10, self.run_agent) #SPEED
+                self.tk.after(1000, self.run_agent) #SPEED
             else:
                 # If the game is done, process the end of the game
                 print("Game Over!")
@@ -153,6 +167,7 @@ class Minesweeper:
                 self.total_rewards.append(self.cumulative_reward)
                 self.steps_per_game.append(self.current_step)
                 self.log_performance()
+                self.update_stats()
 
                 self.reset_game()
 
@@ -182,11 +197,11 @@ class Minesweeper:
             for c in range(self.cols):
                 tile = self.tiles[f"{r}_{c}"]
                 tile["button"].config(image=self.images["plain"])  # Reset tiles to initial state
+        self.startTime = datetime.now() # Q's add
         self.game_over = False
         self.current_step = 0
         self.cumulative_reward = 0
         self.run_agent()  # Restart the agent for a new game
-
 
     def setup(self):
         self.tiles = {}
@@ -218,6 +233,31 @@ class Minesweeper:
                 tile_id = f"{x}_{y}"
                 tile = self.tiles[tile_id]
                 tile["mines"] = sum(1 for n in self.getNeighbors(x, y) if n["isMine"])
+
+    def cell_revealed(self, x, y):
+        self.revealed_cells += 1
+
+    def percentage_cleared(self):
+        return self.revealed_cells / (self.cols * self.rows) * 100
+    
+    def update_stats(self): # Q add: in progress
+        # Update the stats labels with the latest values
+        self.stats_labels["total_episodes"].config(text=f"Total games: {self.total_episodes}")
+        self.stats_labels["total_wins"].config(text=f"Total wins: {self.wins}")
+        self.stats_labels["total_reward"].config(text=f"Total reward: {self.cumulative_reward}")
+
+    def updateTimer(self):
+        if not self.game_over:
+            if self.startTime is not None:
+                elapsed = datetime.now() - self.startTime
+                # Manually format the elapsed time
+                hours, remainder = divmod(elapsed.total_seconds(), 3600)
+                minutes, seconds = divmod(remainder, 60)
+                # Update the timer label with the elapsed time formatted as HH:MM:SS
+                self.labels['time'].config(text=f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}")
+            # Schedule this method to be called again after 1000 milliseconds (1 second)
+            self.frame.after(1000, self.updateTimer)
+
     """ old structure
     def restart(self):
         self.setup()
@@ -390,16 +430,6 @@ class Minesweeper:
                 if 0 <= nx < SIZE_X and 0 <= ny < SIZE_Y and (dx != 0 or dy != 0):
                     neighbors.append(self.tiles[f"{nx}_{ny}"])
         return neighbors
-
-    def updateTimer(self):
-        ts = "00:00:00"
-        if self.startTime is not None:
-            delta = datetime.now() - self.startTime
-            ts = str(delta).split('.')[0]  # Drop milliseconds
-            if delta.total_seconds() < 36000:
-                ts = "0" + ts  # Zero-pad
-        self.labels["time"].config(text=ts)
-        self.frame.after(100, self.updateTimer)
     
         """ old gui based on state
     def update_gui_based_on_state(self):
