@@ -2,6 +2,9 @@
 __pycache__/
 __pycache__
 
+.history
+.history/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
