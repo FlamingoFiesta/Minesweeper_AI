@@ -21,9 +21,9 @@ sys.path.append(parent_dir)
 from ReinforcementLearning.minesweeper_env import MinesweeperEnv
 from ReinforcementLearning.dqn_agent import DQNAgent
 
-SIZE_X = 11
-SIZE_Y = 11
-NUM_MINES = 20
+SIZE_X = 3
+SIZE_Y = 3
+NUM_MINES = 1
 
 STATE_DEFAULT = 0
 STATE_CLICKED = 1
@@ -90,7 +90,8 @@ class Minesweeper:
             "stats": Label(self.frame, text="Statistics: "),
             "total_episodes": Label(self.frame, text="Total episodes: 0"),
             "total_wins": Label(self.frame, text="Total wins: 0"),
-            "total_reward": Label(self.frame, text="Total reward: 0")
+            "total_reward": Label(self.frame, text="Total reward: 0"),
+            "percentage_cleared": Label(self.frame, text="Percentage cleared: 0%")
         }
 
         stats_column = self.cols + 1 
@@ -98,6 +99,7 @@ class Minesweeper:
         self.stats_labels["total_episodes"].grid(row=1, column=stats_column, sticky="nw")
         self.stats_labels["total_wins"].grid(row=2, column=stats_column, sticky="nw")
         self.stats_labels["total_reward"].grid(row=3, column=stats_column, sticky="nw") 
+        self.stats_labels["percentage_cleared"].grid(row=4, column=stats_column, sticky="nw") 
 
         self.labels["time"].grid(row=0, column=0, columnspan=self.cols) # top full width
         self.labels["mines"].grid(row=self.rows+1, column=0, columnspan=int(self.cols/2)) # bottom left
@@ -150,7 +152,7 @@ class Minesweeper:
             self.update_gui_based_on_state()  # Refresh the entire board
             if not done:
                 # If the game is not done, schedule the next action
-                self.tk.after(1000, self.run_agent) #SPEED
+                self.tk.after(1, self.run_agent) #SPEED
             else:
                 # If the game is done, process the end of the game
                 print("Game Over!")
@@ -235,16 +237,15 @@ class Minesweeper:
                 tile["mines"] = sum(1 for n in self.getNeighbors(x, y) if n["isMine"])
 
     def cell_revealed(self, x, y):
-        self.revealed_cells += 1
-
-    def percentage_cleared(self):
-        return self.revealed_cells / (self.cols * self.rows) * 100
+        self.revealed_cells += 1      
     
     def update_stats(self): # Q add: in progress
+        self.percentage_cleared = self.revealed_cells / (self.cols * self.rows) * 100
         # Update the stats labels with the latest values
         self.stats_labels["total_episodes"].config(text=f"Total games: {self.total_episodes}")
         self.stats_labels["total_wins"].config(text=f"Total wins: {self.wins}")
         self.stats_labels["total_reward"].config(text=f"Total reward: {self.cumulative_reward}")
+        self.stats_labels["percentage_cleared"].config(text=f'Percentage cleared: {self.percentage_cleared}%')
 
     def updateTimer(self):
         if not self.game_over:
