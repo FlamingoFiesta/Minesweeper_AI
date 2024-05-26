@@ -167,6 +167,8 @@ class MinesweeperEnv:
             print("Action taken while game over.")
             return self.get_obs(), 0, True, self.game_over  # No action allowed if game is over
 
+        reward = 0
+
         if flag:
             if not self.explored[r][c] and not self.flagged[r][c]:
                 self.flagged[r][c] = True
@@ -198,6 +200,8 @@ class MinesweeperEnv:
                     self.reveal_adjacent_cells(r, c)  # Additional logic to reveal adjacent cells if the cell is empty
 
         done = self.check_win_condition() or self.game_over
+        if done:
+            print(f"Game Over! Done: {done}, Game Over: {self.game_over}")
         return self.get_obs(), reward, done, self.game_over
 
     def reveal_adjacent_cells(self, r, c):
@@ -216,7 +220,10 @@ class MinesweeperEnv:
         """Check if all non-mine cells are revealed"""
         not_mined = self.grid != -1
         revealed_or_flagged = self.explored | self.flagged
-        return np.all(revealed_or_flagged == not_mined)
+        all_revealed = np.all(self.explored[not_mined])
+        print(f"Check win condition: Not mined cells revealed: {all_revealed}")
+        return all_revealed
+        #return np.all(revealed_or_flagged == not_mined)
 
     def _get_obs(self):
         return np.where(self.explored, self.grid, -2)

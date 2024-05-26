@@ -23,7 +23,7 @@ from ReinforcementLearning.dqn_agent import DQNAgent
 
 SIZE_X = 3
 SIZE_Y = 3
-NUM_MINES = 1
+NUM_MINES = 9
 
 STATE_DEFAULT = 0
 STATE_CLICKED = 1
@@ -58,6 +58,8 @@ class Minesweeper:
 
         self.env = MinesweeperEnv(SIZE_X, SIZE_Y, NUM_MINES)
         self.agent = DQNAgent(SIZE_X * SIZE_Y, action_size)
+
+        self.running = False
 
         # import images
         self.images = {
@@ -141,6 +143,10 @@ class Minesweeper:
             """
 
     def run_agent(self):
+
+        if not self.running:
+            return
+
         if not self.game_over:
             current_state = np.array([self.env.get_obs()]).flatten()
             action = self.agent.act(current_state)
@@ -157,25 +163,32 @@ class Minesweeper:
                 # If the game is done, process the end of the game
                 print("Game Over!")
                 self.total_episodes += 1
+                print(f"Game over state: {self.game_over}, reward: {reward}, done: {done}")
 
                 if self.game_over:
 
                     self.reveal_all_mines()
                     self.show_exploded_mine(action)  # Highlight the exploded mine
                   # Ask if the user wants to restart
-                else:
+                elif self.env.check_win_condition(): #having the else would sometimes count as a win
+        
                     self.wins += 1
-                
+                    print(f"Win count increased to {self.wins}")
+
                 self.total_rewards.append(self.cumulative_reward)
                 self.steps_per_game.append(self.current_step)
                 self.log_performance()
                 self.update_stats()
 
-                self.reset_game()
+                #self.reset_game()
+
+                self.running = False
 
                 if self.total_episodes % 10 == 0:  # Example: Save every 1 episodes
                     self.agent.save()
                     print(f"Model saved after {self.total_episodes} episodes.")
+
+                self.reset_game()
         else:
             # If the game is already marked as over, skip to asking for restart
             self.reset_game()
@@ -184,7 +197,7 @@ class Minesweeper:
         # Print out the performance metrics
         print(f"Total Episodes: {self.total_episodes}, Wins: {self.wins}, Total Reward: {self.cumulative_reward}, Steps/Game: {np.mean(self.steps_per_game)}")    
     
-    def reset_game_old(self):
+    def reset_gameo_old(self):
         #self.state = self.env.reset()
         #self.setup()
         self.env.reset()
@@ -203,9 +216,13 @@ class Minesweeper:
         self.game_over = False
         self.current_step = 0
         self.cumulative_reward = 0
-        self.run_agent()  # Restart the agent for a new game
+        self.revealed_cells = 0
+        self.running = True
+        print("Game has been reset.")
+        self.tk.after(1000, self.run_agent)
+        #self.run_agent()  # Restart the agent for a new game
 
-    def setup(self):
+    def setup_old(self):
         self.tiles = {}
         self.flagCount = 0
         self.correctFlagCount = 0
@@ -228,6 +245,40 @@ class Minesweeper:
                 tile["button"].bind(BTN_FLAG, self.onRightClickWrapper(x, y))
                 tile["button"].grid(row=x+1, column=y)  # Offset for labels
                 self.tiles[id] = tile
+
+        # Calculate mines around each tile
+        for x in range(SIZE_X):
+            for y in range(SIZE_Y):
+                tile_id = f"{x}_{y}"
+                tile = self.tiles[tile_id]
+                tile["mines"] = sum(1 for n in self.getNeighbors(x, y) if n["isMine"])
+
+    def setup(self):
+        self.tiles = {}
+        self.flagCount = 0
+        self.correctFlagCount = 0
+        self.clickedCount = 0
+        self.mines = 0
+        total_tiles = SIZE_X * SIZE_Y
+        mine_positions = set(random.sample(range(total_tiles), NUM_MINES))
+
+        for i in range(total_tiles):
+            x, y = divmod(i, SIZE_Y)
+            id = f"{x}_{y}"
+            isMine = i in mine_positions
+            self.mines += isMine
+            tile = {
+                "id": id,
+                "isMine": isMine,
+                "state": STATE_DEFAULT,
+                "coords": {"x": x, "y": y},
+                "button": Button(self.frame, image=self.images["plain"]),
+                "mines": 0  # Will be calculated later
+            }
+            tile["button"].bind(BTN_CLICK, self.onClickWrapper(x, y))
+            tile["button"].bind(BTN_FLAG, self.onRightClickWrapper(x, y))
+            tile["button"].grid(row=x+1, column=y)  # Offset for labels
+            self.tiles[id] = tile
 
         # Calculate mines around each tile
         for x in range(SIZE_X):

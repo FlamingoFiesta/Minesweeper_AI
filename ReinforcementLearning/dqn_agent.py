@@ -11,10 +11,10 @@ import os
 class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(121, 64) # Q Change because of mismatch of shape
+        self.fc1 = nn.Linear(input_dim, 64) # Q Change because of mismatch of shape
         self.fc2 = nn.Linear(64, 128) 
         self.fc3 = nn.Linear(128, 64)
-        self.output = nn.Linear(64, 242) # Q Change because of mismatch of shape
+        self.output = nn.Linear(64, output_dim) # Q Change because of mismatch of shape
 
     def forward(self, state):
         x = torch.relu(self.fc1(state))
