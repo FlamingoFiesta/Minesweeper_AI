@@ -24,7 +24,7 @@ from ReinforcementLearning.dqn_agent import DQNAgent
 SIZE_X = 11
 SIZE_Y = 11
 NUM_MINES = 20
-
+#UATAFAC
 STATE_DEFAULT = 0
 STATE_CLICKED = 1
 STATE_FLAGGED = 2
