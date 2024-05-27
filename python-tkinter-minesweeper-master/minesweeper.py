@@ -8,6 +8,10 @@ import random
 import platform
 import time
 from datetime import time, date, datetime
+from collections import deque # to calculate the win rate 
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 import numpy as np
 import random
@@ -53,6 +57,7 @@ class Minesweeper:
         #action_size = SIZE_X * SIZE_Y
         #self.env = MinesweeperEnv(SIZE_X, SIZE_Y, NUM_MINES)
         #self.agent = DQNAgent(SIZE_X * SIZE_Y, SIZE_X * SIZE_Y)
+        self.after_ids = []
 
         action_size = 2 * SIZE_X * SIZE_Y  # Each cell can either be revealed or flagged
 
@@ -76,6 +81,9 @@ class Minesweeper:
         self.frame = Frame(self.tk)
         self.frame.pack()
 
+        # Win Loss Rate
+        self.win_loss = deque(maxlen=50)
+
         # set up labels/UI
         self.labels = {
             "time": Label(self.frame, text = "00:00:00"),
@@ -91,6 +99,7 @@ class Minesweeper:
             "total_episodes": Label(self.frame, text="Total episodes: 0"),
             "total_wins": Label(self.frame, text="Total wins: 0"),
             "total_reward": Label(self.frame, text="Total reward: 0"),
+            "win_rate": Label(self.frame, text="Win-loss rate (of last 50 games): 0%"),
             "percentage_cleared": Label(self.frame, text="Percentage cleared: 0%")
         }
 
@@ -99,7 +108,8 @@ class Minesweeper:
         self.stats_labels["total_episodes"].grid(row=1, column=stats_column, sticky="nw")
         self.stats_labels["total_wins"].grid(row=2, column=stats_column, sticky="nw")
         self.stats_labels["total_reward"].grid(row=3, column=stats_column, sticky="nw") 
-        self.stats_labels["percentage_cleared"].grid(row=4, column=stats_column, sticky="nw") 
+        self.stats_labels["win_rate"].grid(row=4, column=stats_column, sticky="nw")
+        self.stats_labels["percentage_cleared"].grid(row=5, column=stats_column, sticky="nw") 
 
         self.labels["time"].grid(row=0, column=0, columnspan=self.cols) # top full width
         self.labels["mines"].grid(row=self.rows+1, column=0, columnspan=int(self.cols/2)) # bottom left
@@ -111,6 +121,27 @@ class Minesweeper:
         #self.restart() # start game
         self.reset_game()
         self.updateTimer() # init timer
+
+        
+    def update_plot(self, frame):
+        ax = plt.gca()
+        ax.cla()
+
+        win_loss_list = list(self.win_loss)
+        win_loss_over_time = [float(sum(win_loss_list[:i+1])) / (i+1) * 100 for i in range(len(win_loss_list))]
+
+        ax.plot(range(len(win_loss_over_time)), win_loss_over_time)
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Win Rate (%)")
+        ax.set_ylim(0, 100)
+
+        if self.total_episodes >= 50:
+            ax.set_xticks([0, len(win_loss_list) - 1])
+            ax.set_xticklabels([f"{self.total_episodes - len(win_loss_list) + 1}", f"{self.total_episodes}"])
+
+        id = self.tk.after(100, self.run_agent)
+        self.after_ids.append(id)
+
 
     def run_agent_idk(self):
         if not self.game_over:
@@ -152,7 +183,7 @@ class Minesweeper:
             self.update_gui_based_on_state()  # Refresh the entire board
             if not done:
                 # If the game is not done, schedule the next action
-                self.tk.after(1, self.run_agent) #SPEED
+                self.tk.after(50, self.run_agent) #SPEED
             else:
                 # If the game is done, process the end of the game
                 print("Game Over!")
@@ -163,8 +194,15 @@ class Minesweeper:
                     self.reveal_all_mines()
                     self.show_exploded_mine(action)  # Highlight the exploded mine
                   # Ask if the user wants to restart
+
+                    result = 0 # a loss
+
                 else:
                     self.wins += 1
+
+                    result = 1 # a win
+
+                self.update_win_loss(result)
                 
                 self.total_rewards.append(self.cumulative_reward)
                 self.steps_per_game.append(self.current_step)
@@ -176,6 +214,8 @@ class Minesweeper:
                 if self.total_episodes % 10 == 0:  # Example: Save every 1 episodes
                     self.agent.save()
                     print(f"Model saved after {self.total_episodes} episodes.")
+
+
         else:
             # If the game is already marked as over, skip to asking for restart
             self.reset_game()
@@ -245,6 +285,7 @@ class Minesweeper:
         self.stats_labels["total_episodes"].config(text=f"Total games: {self.total_episodes}")
         self.stats_labels["total_wins"].config(text=f"Total wins: {self.wins}")
         self.stats_labels["total_reward"].config(text=f"Total reward: {self.cumulative_reward}")
+        self.stats_labels["win_rate"].config(text=f"Win-loss rate (of last 50 games): {self.win_loss_rate}%")
         self.stats_labels["percentage_cleared"].config(text=f'Percentage cleared: {self.percentage_cleared}%')
 
     def updateTimer(self):
@@ -258,6 +299,11 @@ class Minesweeper:
                 self.labels['time'].config(text=f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}")
             # Schedule this method to be called again after 1000 milliseconds (1 second)
             self.frame.after(1000, self.updateTimer)
+
+    def update_win_loss(self, win):
+        self.win_loss.append(win)
+
+        self.win_loss_rate = float(sum(self.win_loss)) / len(self.win_loss) * 100
 
     """ old structure
     def restart(self):
@@ -493,18 +539,45 @@ def main():
     # create game instance
     minesweeper = Minesweeper(window)
 
+    graph_window = Toplevel()
+    graph_window.title("Win-Loss Graph")
+
     try:
         minesweeper.agent.load()  # Path is managed within the agent
         print("Model loaded successfully.")
     except FileNotFoundError:
         print("No saved model found, starting with a new model.")
 
+    fig = plt.figure()
+    
+    # Embed the figure in the Tkinter window using FigureCanvasTkAgg
+    canvas = FigureCanvasTkAgg(fig, master=graph_window)
+    canvas.get_tk_widget().pack(fill='both', expand=True)
+    canvas.draw()
+
+    # Create the FuncAnimation object that will update the plot
+    ani = FuncAnimation(fig, minesweeper.update_plot, interval=1000, blit=False)   
+
+    is_animation_running = True
+
     def on_close():
+        if not is_animation_running:
+            ani.event_source.stop()
+            plt.close(fig)
         if tkMessageBox.askyesno("Quit", "Do you want to save the model before quitting?"):
             minesweeper.agent.save()
+        if graph_window.winfo_exists():
+            graph_window.destroy()
         window.destroy()
 
+    def on_close_graph():
+        ani.event_source.stop()
+        plt.close(fig)
+        graph_window.destroy()
+        is_animation_running = False
+
     window.protocol("WM_DELETE_WINDOW", on_close)
+    graph_window.protocol("WM_DELETE_WINDOW", on_close_graph)
 
     # run event loop
     window.mainloop()
