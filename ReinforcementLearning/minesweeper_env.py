@@ -14,14 +14,15 @@ class MinesweeperEnv:
         self._place_bombs()
         self._calculate_adjacent_counts()
 
+        # based on claude
         self.rewards = {
             'lose': -5,          # Penalty for hitting a mine
-            'win': 2,            # Reward for clearing all non-mine cells
-            'progress': 3,        # Reward for revealing a non-mine cell
+            'win': 10,            # Reward for clearing all non-mine cells
+            'progress': 1,        # Reward for revealing a non-mine cell
             'no_progress': -1,     # No reward/penalty for ineffective actions
             'guess': 0.5,         # Reward for making a necessary guess
-            'flag': 0.1,          # Small reward for correctly flagging a mine
-            'unflag': -0.2,       # Small penalty for unflagging
+            'flag': 0.2,          # Small reward for correctly flagging a mine
+            'unflag': -0.3,       # Small penalty for unflagging
             'invalid': -1       # Penalty for invalid actions (e.g., flagging an already revealed cell)
         }
 

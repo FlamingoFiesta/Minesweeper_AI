@@ -11,10 +11,10 @@ import os
 class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(121, 64) # Q Change because of mismatch of shape
+        self.fc1 = nn.Linear(input_dim, 64) # Q Change because of mismatch of shape
         self.fc2 = nn.Linear(64, 128) 
         self.fc3 = nn.Linear(128, 64)
-        self.output = nn.Linear(64, 242) # Q Change because of mismatch of shape
+        self.output = nn.Linear(64, output_dim) # Q Change because of mismatch of shape
 
     def forward(self, state):
         x = torch.relu(self.fc1(state))
@@ -35,7 +35,9 @@ class DQNAgent:
         self.epsilon = 1.0  # Exploration rate
         self.epsilon_decay = 0.995
         self.epsilon_min = 0.01
-        self.learning_rate = 0.001
+        self.learning_rate = 0.01
+        self.learning_rate_min = 0.01
+        self.learning_rate_decay = 0.99975
         self.batch_size = 64
         self.model = QNetwork(state_size, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -69,6 +71,9 @@ class DQNAgent:
         
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+
+        if self.learning_rate > self.learning_rate_min:
+            self.learning_rate *= self.learning_rate_decay
 
     def load_old(self, name):
         self.model.load_state_dict(torch.load(name))

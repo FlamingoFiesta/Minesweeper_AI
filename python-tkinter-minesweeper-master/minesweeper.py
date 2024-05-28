@@ -25,9 +25,9 @@ sys.path.append(parent_dir)
 from ReinforcementLearning.minesweeper_env import MinesweeperEnv
 from ReinforcementLearning.dqn_agent import DQNAgent
 
-SIZE_X = 3
-SIZE_Y = 3
-NUM_MINES = 1
+SIZE_X = 5
+SIZE_Y = 5
+NUM_MINES = 4
 
 STATE_DEFAULT = 0
 STATE_CLICKED = 1
@@ -50,10 +50,10 @@ class Minesweeper:
 
         self.total_episodes = 0
         self.wins = 0
+        self.win_loss_rate_5000_games = []
         self.total_rewards = []
         self.steps_per_game = []
         self.current_step = 0
-        self.revealed_cells = 0
         #action_size = SIZE_X * SIZE_Y
         #self.env = MinesweeperEnv(SIZE_X, SIZE_Y, NUM_MINES)
         #self.agent = DQNAgent(SIZE_X * SIZE_Y, SIZE_X * SIZE_Y)
@@ -99,9 +99,8 @@ class Minesweeper:
             "total_episodes": Label(self.frame, text="Total episodes: 0"),
             "total_wins": Label(self.frame, text="Total wins: 0"),
             "total_reward": Label(self.frame, text="Total reward: 0"),
-            "win_rate": Label(self.frame, text="Win-loss rate (of last 50 games): 0%"),
-            "percentage_cleared": Label(self.frame, text="Percentage cleared: 0%")
-        }
+            "win_rate": Label(self.frame, text="Win-loss rate (of last 50 games): 0%")}
+            #"percentage_cleared": Label(self.frame, text="Percentage cleared: 0%")
 
         stats_column = self.cols + 1 
         self.stats_labels["stats"].grid(row=0, column=stats_column, sticky="nw")
@@ -109,7 +108,7 @@ class Minesweeper:
         self.stats_labels["total_wins"].grid(row=2, column=stats_column, sticky="nw")
         self.stats_labels["total_reward"].grid(row=3, column=stats_column, sticky="nw") 
         self.stats_labels["win_rate"].grid(row=4, column=stats_column, sticky="nw")
-        self.stats_labels["percentage_cleared"].grid(row=5, column=stats_column, sticky="nw") 
+        #self.stats_labels["percentage_cleared"].grid(row=5, column=stats_column, sticky="nw") 
 
         self.labels["time"].grid(row=0, column=0, columnspan=self.cols) # top full width
         self.labels["mines"].grid(row=self.rows+1, column=0, columnspan=int(self.cols/2)) # bottom left
@@ -139,7 +138,7 @@ class Minesweeper:
             ax.set_xticks([0, len(win_loss_list) - 1])
             ax.set_xticklabels([f"{self.total_episodes - len(win_loss_list) + 1}", f"{self.total_episodes}"])
 
-        id = self.tk.after(100, self.run_agent)
+        id = self.frame.after(100, self.run_agent)
         self.after_ids.append(id)
 
 
@@ -183,7 +182,7 @@ class Minesweeper:
             self.update_gui_based_on_state()  # Refresh the entire board
             if not done:
                 # If the game is not done, schedule the next action
-                self.tk.after(50, self.run_agent) #SPEED
+                self.tk.after(1, self.run_agent) #SPEED
             else:
                 # If the game is done, process the end of the game
                 print("Game Over!")
@@ -245,20 +244,19 @@ class Minesweeper:
         self.cumulative_reward = 0
         self.run_agent()  # Restart the agent for a new game
 
-    def setup(self):
+    def setup(self): ### CHANGED SO THE NUMBER OF MINES IS FIXED !!!! ### ALSO MAKES IT EASIER FOR THE AGENT
         self.tiles = {}
         self.flagCount = 0
         self.correctFlagCount = 0
         self.clickedCount = 0
-        self.mines = 0
+        self.mines = NUM_MINES
+
         for x in range(SIZE_X):
             for y in range(SIZE_Y):
                 id = f"{x}_{y}"
-                isMine = random.random() < 0.1
-                self.mines += isMine
                 tile = {
                     "id": id,
-                    "isMine": isMine,
+                    "isMine": False,
                     "state": STATE_DEFAULT,
                     "coords": {"x": x, "y": y},
                     "button": Button(self.frame, image=self.images["plain"]),
@@ -269,6 +267,16 @@ class Minesweeper:
                 tile["button"].grid(row=x+1, column=y)  # Offset for labels
                 self.tiles[id] = tile
 
+        mines_placed = 0 
+        while mines_placed < self.mines:
+            x = random.randint(0, SIZE_X - 1)
+            y = random.randint(0, SIZE_Y - 1)
+            tile_id = f"{x}_{y}"
+            tile = self.tiles[tile_id]
+            if not tile["isMine"]:
+                tile["isMine"] = True
+                mines_placed += 1
+
         # Calculate mines around each tile
         for x in range(SIZE_X):
             for y in range(SIZE_Y):
@@ -276,17 +284,17 @@ class Minesweeper:
                 tile = self.tiles[tile_id]
                 tile["mines"] = sum(1 for n in self.getNeighbors(x, y) if n["isMine"])
 
-    def cell_revealed(self, x, y):
-        self.revealed_cells += 1      
+    #def cell_revealed(self, x, y):
+    #    self.revealed_cells += 1      
     
     def update_stats(self): # Q add: in progress
-        self.percentage_cleared = self.revealed_cells / (self.cols * self.rows) * 100
+        #self.percentage_cleared = self.revealed_cells / (self.cols * self.rows) * 100
         # Update the stats labels with the latest values
         self.stats_labels["total_episodes"].config(text=f"Total games: {self.total_episodes}")
         self.stats_labels["total_wins"].config(text=f"Total wins: {self.wins}")
         self.stats_labels["total_reward"].config(text=f"Total reward: {self.cumulative_reward}")
         self.stats_labels["win_rate"].config(text=f"Win-loss rate (of last 50 games): {self.win_loss_rate}%")
-        self.stats_labels["percentage_cleared"].config(text=f'Percentage cleared: {self.percentage_cleared}%')
+        #self.stats_labels["percentage_cleared"].config(text=f'Percentage cleared: {self.percentage_cleared}%')
 
     def updateTimer(self):
         if not self.game_over:
@@ -298,12 +306,17 @@ class Minesweeper:
                 # Update the timer label with the elapsed time formatted as HH:MM:SS
                 self.labels['time'].config(text=f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}")
             # Schedule this method to be called again after 1000 milliseconds (1 second)
-            self.frame.after(1000, self.updateTimer)
+            id = self.frame.after(1000, self.updateTimer)
+            self.after_ids.append(id)
 
     def update_win_loss(self, win):
         self.win_loss.append(win)
 
         self.win_loss_rate = float(sum(self.win_loss)) / len(self.win_loss) * 100
+
+        if self.total_episodes % 5000 == 0:
+            self.win_loss_rate_5000_games.append(self.win_loss_rate)
+
 
     """ old structure
     def restart(self):
@@ -560,6 +573,12 @@ def main():
 
     is_animation_running = True
 
+    def improvement_graph():
+        for win_loss in minesweeper.win_loss_rate_5000_games:
+            print(f"episode {win_loss * 500} had a win rate of {minesweeper.win_loss_rate_5000_games[win_loss]}")       
+        plt.plot(minesweeper.win_loss_rate_5000_games)
+        plt.show()
+
     def on_close():
         if not is_animation_running:
             ani.event_source.stop()
@@ -569,6 +588,7 @@ def main():
         if graph_window.winfo_exists():
             graph_window.destroy()
         window.destroy()
+        improvement_graph()
 
     def on_close_graph():
         ani.event_source.stop()
