@@ -16,14 +16,14 @@ class MinesweeperEnv:
 
         # based on claude
         self.rewards = {
-            'lose': -5,          # Penalty for hitting a mine
-            'win': 10,            # Reward for clearing all non-mine cells
-            'progress': 1,        # Reward for revealing a non-mine cell
-            'no_progress': -1,     # No reward/penalty for ineffective actions
-            'guess': 0.5,         # Reward for making a necessary guess
-            'flag': 0.2,          # Small reward for correctly flagging a mine
-            'unflag': -0.3,       # Small penalty for unflagging
-            'invalid': -1       # Penalty for invalid actions (e.g., flagging an already revealed cell)
+            'lose': -1,          # Penalty for hitting a mine
+            'win': 1,            # Reward for clearing all non-mine cells
+            'progress': 0.3,        # Reward for revealing a non-mine cell
+            'no_progress': -0.4,     # No reward/penalty for ineffective actions
+            'guess': -0.3,         # Reward for making a necessary guess
+            'flag': 0,          # Small reward for correctly flagging a mine
+            'unflag': 0,       # Small penalty for unflagging
+            'invalid': 0       # Penalty for invalid actions (e.g., flagging an already revealed cell)
         }
 
     def _place_bombs(self):
@@ -158,7 +158,7 @@ class MinesweeperEnv:
 
         return new_state_im, reward, done
 
-    def step(self, action):
+    def stepoldoldold(self, action):
         flag = action >= self.rows * self.cols  # Determine if the action is to flag/unflag
         cell_index = action % (self.rows * self.cols)
         r = cell_index // self.cols
@@ -195,6 +195,60 @@ class MinesweeperEnv:
                 self.explored[r][c] = True
                 reward = self.rewards['progress']
                 print(f"Revealed safe cell ({r}, {c}). Reward: {reward}")
+                if self.grid[r][c] == 0:
+                    self.reveal_adjacent_cells(r, c)  # Additional logic to reveal adjacent cells if the cell is empty
+
+        done = self.check_win_condition() or self.game_over
+        return self.get_obs(), reward, done, self.game_over
+    
+    def step(self, action):
+        flag = action >= self.rows * self.cols  # Determine if the action is to flag/unflag
+        cell_index = action % (self.rows * self.cols)
+        r = cell_index // self.cols
+        c = cell_index % self.cols
+
+        if self.game_over:
+            print("Action taken while game over.")
+            return self.get_obs(), 0, True, self.game_over  # No action allowed if game is over
+
+        if flag:
+            if not self.explored[r][c] and not self.flagged[r][c]:
+                self.flagged[r][c] = True
+                adj_cells = self._adjacent_cells(r, c)
+                if not any(self.explored[x][y] for x, y in adj_cells):
+                    reward = 0
+                    print(f"Guessed a flag ({r}, {c}). Reward: {reward}")
+                else:
+                    reward = self.rewards['flag']
+                    print(f"Flagged cell ({r}, {c}). Reward: {reward}")
+            elif self.flagged[r][c]:
+                self.flagged[r][c] = False
+                reward = self.rewards['unflag']
+                print(f"Unflagged cell ({r}, {c}). Reward: {reward}")
+            else:
+                reward = self.rewards['invalid']
+                print(f"Invalid flag action at ({r}, {c}). Reward: {reward}")
+        else:
+            if self.flagged[r][c]:
+                reward = self.rewards['invalid']
+                print(f"Attempt to reveal flagged cell ({r}, {c}). Reward: {reward}")
+            elif self.explored[r][c]:
+                reward = self.rewards['no_progress']
+                print(f"Attempt to reveal explored cell ({r}, {c}). Reward: {reward}")
+            elif self.grid[r][c] == -1:
+                self.game_over = True
+                reward = self.rewards['lose']
+                print(f"Hit mine at ({r}, {c}). Game over.")
+            else:
+                self.explored[r][c] = True
+                adj_cells = self._adjacent_cells(r, c)
+                if not any(self.explored[x][y] for x, y in adj_cells):
+                    reward = self.rewards['guess']
+                    print(f"Guesed a safe cell ({r}, {c}). Reward: {reward}")
+                else:
+                    reward = self.rewards['progress']
+                    print(f"Revealed safe cell ({r}, {c}). Reward: {reward}")
+
                 if self.grid[r][c] == 0:
                     self.reveal_adjacent_cells(r, c)  # Additional logic to reveal adjacent cells if the cell is empty
 

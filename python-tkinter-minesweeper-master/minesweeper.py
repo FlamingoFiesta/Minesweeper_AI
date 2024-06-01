@@ -12,6 +12,7 @@ from collections import deque # to calculate the win rate
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import threading
 
 import numpy as np
 import random
@@ -50,6 +51,7 @@ class Minesweeper:
 
         self.total_episodes = 0
         self.wins = 0
+        self.win_loss_rate = 0
         self.win_loss_rate_5000_games = []
         self.total_rewards = []
         self.steps_per_game = []
@@ -59,7 +61,8 @@ class Minesweeper:
         #self.agent = DQNAgent(SIZE_X * SIZE_Y, SIZE_X * SIZE_Y)
         self.after_ids = []
 
-        action_size = 2 * SIZE_X * SIZE_Y  # Each cell can either be revealed or flagged
+        action_size = SIZE_X * SIZE_Y  # Each cell can either be revealed or flagged
+        self.actions = action_size
 
         self.env = MinesweeperEnv(SIZE_X, SIZE_Y, NUM_MINES)
         self.agent = DQNAgent(SIZE_X * SIZE_Y, action_size)
@@ -171,6 +174,48 @@ class Minesweeper:
             """
 
     def run_agent(self):
+        print(f'SOMEHOW WE END UP HERE ')
+        if not self.game_over:
+            current_state = np.array([self.env.get_obs()]).flatten()
+            action = self.agent.act(current_state)
+            next_state, reward, done, self.game_over = self.env.step(action)
+
+            self.current_step += 1
+            self.cumulative_reward += reward
+
+            self.update_gui_based_on_state()  # Refresh the entire board
+            if not done:
+                # If the game is not done, schedule the next action
+                self.tk.after(10, self.run_agent) #SPEED 
+            else:
+                # If the game is done, process the end of the game
+                print("Game Over!")
+                self.total_episodes += 1
+
+                if self.game_over:
+                    print(f'MAGIC KK HOEREENENENEN')
+
+                    self.reveal_all_mines()
+                    self.show_exploded_mine(action)  # Highlight the exploded mine
+                  # Ask if the user wants to restart
+                else:
+                    self.wins += 1
+                
+                self.total_rewards.append(self.cumulative_reward)
+                self.steps_per_game.append(self.current_step)
+                self.log_performance()
+                self.update_stats()
+
+                self.reset_game()
+
+                if self.total_episodes % 10 == 0:  # Example: Save every 1 episodes
+                    self.agent.save()
+                    print(f"Model saved after {self.total_episodes} episodes.")
+        else:
+            # If the game is already marked as over, skip to asking for restart
+            self.reset_game()
+
+    def run_agentold(self):
         if not self.game_over:
             current_state = np.array([self.env.get_obs()]).flatten()
             action = self.agent.act(current_state)
@@ -214,10 +259,59 @@ class Minesweeper:
                     self.agent.save()
                     print(f"Model saved after {self.total_episodes} episodes.")
 
-
         else:
             # If the game is already marked as over, skip to asking for restart
             self.reset_game()
+
+    def run_agentnew(self):
+        IMAX = 1000
+        for episode in range(IMAX):
+            if not self.game_over:
+                current_state = np.array([self.env.get_obs()]).flatten()
+                action = self.agent.act(current_state)
+                next_state, reward, done, self.game_over = self.env.step(action)
+
+                self.current_step += 1
+                self.cumulative_reward += reward
+
+                self.update_gui_based_on_state()  # Refresh the entire board
+                if not done:
+                    # If the game is not done, schedule the next action
+                    self.tk.after(1) #SPEED
+                else:
+                    # If the game is done, process the end of the game
+                    print("Game Over!")
+                    self.total_episodes += 1
+
+                    if self.game_over:
+
+                        self.reveal_all_mines()
+                        self.show_exploded_mine(action)  # Highlight the exploded mine
+                    # Ask if the user wants to restart
+
+                        result = 0 # a loss
+
+                    else:
+                        self.wins += 1
+
+                        result = 1 # a win
+
+                    self.update_win_loss(result)
+                    
+                    self.total_rewards.append(self.cumulative_reward)
+                    self.steps_per_game.append(self.current_step)
+                    self.log_performance()
+                    self.update_stats()
+
+                    self.reset_game()
+
+                    if self.total_episodes % 10 == 0:  # Example: Save every 1 episodes
+                        self.agent.save()
+                        print(f"Model saved after {self.total_episodes} episodes.")
+
+            else:
+                # If the game is already marked as over, skip to asking for restart
+                self.reset_game()
     
     def log_performance(self):
         # Print out the performance metrics
