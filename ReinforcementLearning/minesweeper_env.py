@@ -269,6 +269,12 @@ class MinesweeperEnv:
 
     def check_win_condition(self):
         """Check if all non-mine cells are revealed"""
+        not_mines = self.grid != -1
+        revealed = self.explored
+        return np.all(not_mines == revealed)
+
+    def check_win_conditionold(self):
+        """Check if all non-mine cells are revealed"""
         not_mined = self.grid != -1
         revealed_or_flagged = self.explored | self.flagged
         return np.all(revealed_or_flagged == not_mined)
